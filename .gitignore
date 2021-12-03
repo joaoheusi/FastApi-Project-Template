@@ -1,0 +1,5 @@
+/titania/
+/.env
+**/__pycache__/
+/.pytest_cache/
+/test.py

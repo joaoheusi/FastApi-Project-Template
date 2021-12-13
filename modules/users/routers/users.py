@@ -1,28 +1,28 @@
 from fastapi import APIRouter, Body, status, Depends
-from typing import List
+from typing import List, Optional
 
 
 from fastapi.responses import JSONResponse
-from modules.users.models.user import UpdateUser, User, CreateUser
+from modules.users.models.users import UpdateUser, User, CreateUser
 from modules.users.services.users import (
-    authenticate_service,
     create_user_service,
     delete_user_service,
     find_all_service,
     find_one_service,
     update_user_service,
 )
+from auth.auth_services import authenticate_user_service
+from fastapi.encoders import jsonable_encoder
 from auth.auth_bearer import JWTBearer
-from fastapi.security import OAuth2PasswordRequestForm
-
-oauth2_scheme = JWTBearer(tokenUrl="users/authenticate")
 
 from uuid import uuid4
 
+users_auth_scheme = JWTBearer(tokenUrl="auth",moduleName="users")
 
 router = APIRouter(
     prefix="/users",
     tags=["users"],
+    dependencies=[Depends(users_auth_scheme)],
 )
 
 
@@ -38,9 +38,9 @@ async def get_users():
     response_model=User,
 )
 async def get_user(id: str):
-    user = await find_one_service(id)
+    user : Optional[User] = await find_one_service(id)
     if user:
-        return JSONResponse(status_code=status.HTTP_200_OK, content=user)
+        return JSONResponse(status_code=status.HTTP_200_OK, content=jsonable_encoder(user))
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND, content={"Error": "User not found!"}
     )
@@ -48,9 +48,9 @@ async def get_user(id: str):
 
 @router.post("/", response_description="Create a new user", response_model=User)
 async def create_user(requestBody: CreateUser = Body(...)):
-    created_user = await create_user_service(requestBody)
+    created_user: Optional[User] = await create_user_service(requestBody)
     if created_user:
-        return JSONResponse(status_code=status.HTTP_201_CREATED, content=created_user)
+        return JSONResponse(status_code=status.HTTP_201_CREATED, content=jsonable_encoder(created_user))
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"Error": "User could not be created"},
@@ -68,7 +68,7 @@ async def update_user(id: str, requestBody: UpdateUser = Body(...)):
 
 
 @router.delete("/{id}", response_description="Deletes specified user")
-async def delete_user(id: str, acess_token : str = Depends(oauth2_scheme)):
+async def delete_user(id: str):
     deleted = await delete_user_service(id)
     if deleted:
         return JSONResponse(
@@ -77,8 +77,3 @@ async def delete_user(id: str, acess_token : str = Depends(oauth2_scheme)):
     return JSONResponse(
         status_code=status.HTTP_404_NOT_FOUND, content={"Error": "User not found!"}
     )
-
-@router.post("/authenticate")
-async def authenticate(form_data: OAuth2PasswordRequestForm = Depends()):
-    token = await authenticate_service(form_data)
-    return JSONResponse(status_code=status.HTTP_200_OK, content=token)

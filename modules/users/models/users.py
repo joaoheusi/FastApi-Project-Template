@@ -1,7 +1,6 @@
-from motor.frameworks.asyncio import pymongo_class_wrapper
 from pydantic import BaseModel, EmailStr
-from typing import Optional
-from uuid import UUID, uuid4
+from typing import Optional, List
+from uuid import uuid4
 
 from pydantic.fields import Field
 
@@ -13,6 +12,7 @@ class User(BaseModel):
     password: str
     fullName: Optional[str] = None
     disabled: Optional[bool] = None
+    allowedModules: Optional[List[str]] = []
 
 
 class CreateUser(BaseModel):
@@ -26,3 +26,4 @@ class UpdateUser(BaseModel):
     fullName: Optional[str]
     email: Optional[str]
     password: Optional[str]
+    allowedModules: Optional[List[str]]

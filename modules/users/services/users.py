@@ -1,38 +1,28 @@
-from typing import Optional
-from fastapi.exceptions import HTTPException
-from auth.auth_handler import create_access_token
-from datetime import datetime,timedelta
-from jose import JWTError,jwt
-from fastapi.security import OAuth2PasswordRequestForm
-from modules.users.models.user import CreateUser, User, UpdateUser
-from config import ACCESS_TOKEN_EXPIRE_MINUTES, ALGORITHM, SECRET_KEY, database_client, encryption_context
+from modules.users.models.users import CreateUser, User, UpdateUser
+from config import database_client, encryption_context
 from fastapi.encoders import jsonable_encoder
+from typing import List
 
-
-from test import update_student
 
 users_repository = database_client.users
 
 
-async def create_user_service(requestBody: CreateUser):
-    try:
-        new_user: User = User(
-            username=requestBody.username,
-            email=requestBody.email,
-            password=encryption_context.hash(requestBody.password),
-            fullName=requestBody.fullName,
-            disabled=False,
-        )
-        # print(new_user)
-        new_user = await users_repository.insert_one(jsonable_encoder(new_user))
-        response = await users_repository.find_one({"_id": new_user.inserted_id})
-
-        return response
-    except:
-        return False
+async def create_user_service(requestBody: CreateUser) -> User|None:
+    new_user: User = User(
+        username=requestBody.username,
+        email=requestBody.email,
+        password=encryption_context.hash(requestBody.password),
+        fullName=requestBody.fullName,
+        disabled=False,
+    )
+    new_user = await users_repository.insert_one(jsonable_encoder(new_user))
+    new_user: User|None = await find_one_service(new_user.inserted_id)
+    if new_user:
+        return new_user
+    return None 
 
 
-async def find_all_service():
+async def find_all_service() -> List[User]| List:
     try:
         users = await users_repository.find().to_list(100)
         return users
@@ -40,14 +30,21 @@ async def find_all_service():
         return False
 
 
-async def find_one_service(user_id: str):
+async def find_one_service(user_id: str) -> User|None:
     try:
-        user = await users_repository.find_one({"_id": user_id})
+        user : User| None = await users_repository.find_one({"_id": user_id})
+        user = User(**user)
         return user
     except:
-        return False
-
-
+        return None
+    
+async def find_one_by_name(username: str) -> User|None:
+    try:
+        user = await users_repository.find_one({"username": username})
+        user : User= User(**user)
+        return user
+    except:
+        return None
 
 async def update_user_service(user_id: str, new_user_info: UpdateUser):
     try:
@@ -76,23 +73,3 @@ async def delete_user_service(user_id: str):
         return True
     return False
 
-
-
-#TODO ADD TOKEN VALIDATION FUNCTION
-#EXPIRATION TIME SHOULD BE VALIDATED
-#ANOTHER STUFF SHOULD BE VALIDATED
-
-async def validate_token():
-    pass
-
-async def authenticate_service(form_data: OAuth2PasswordRequestForm):
-    user = await users_repository.find_one({"username":form_data.username})
-    user = User(**user)
-    if not user:
-        return False
-    if not encryption_context.verify(form_data.password, user.password):
-        return False
-    access_token = create_access_token(
-        data={"sub": user.username}
-        )
-    return {"acessToken": access_token, "tokenType": "Bearer"}
